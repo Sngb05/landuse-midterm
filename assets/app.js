@@ -518,8 +518,8 @@
       ask: '도시영향권의 경계는 A시로부터 몇 km 지점인가?',
       unit: 'km', answer: da, tol: 0.06,
       steps: [
-        `√(P<sub>B</sub> / P<sub>A</sub>) = √(${pb} / ${pa}) = √${fmt(pb / pa, 2)} = ${r}`,
-        `D<sub>A</sub> = ${fmt(dist, 1)} ÷ (1 + ${r}) = ${fmt(dist, 1)} ÷ ${fmt(1 + r, 1)} = <b>${da} km</b>`,
+        `√(P<sub>b</sub> / P<sub>a</sub>) = √(${pb} / ${pa}) = √${fmt(pb / pa, 2)} = ${r}`,
+        `M<sub>ab</sub> = ${fmt(dist, 1)} ÷ (1 + ${r}) = ${fmt(dist, 1)} ÷ ${fmt(1 + r, 1)} = <b>${da} km</b>`,
         `B시로부터는 ${fmt(dist, 1)} − ${da} = ${fmt(dist - da, 1)} km`,
       ],
     };
@@ -544,6 +544,29 @@
         `주택 연면적 = ${fmt(units, 0)} × ${size}㎡ = ${fmt(floor, 0)}㎡`,
         `순주거용지 = 연면적 ÷ 용적률 = ${fmt(floor, 0)} ÷ ${far / 100} = ${fmt(net, 0)}㎡`,
         `총주거용지 = 순주거용지 ÷ (1 − 공공용지율) = ${fmt(net, 0)} ÷ ${fmt(1 - pub / 100, 2)} = ${fmt(total, 0)}㎡ = <b>${fmt(total / 10000, 2)} ha</b>`,
+      ],
+    };
+  }
+
+  function genPop() {
+    const p0 = pick([25, 40, 60, 80, 120, 150]) * 10000;
+    const r = pick([0.5, 1, 1.5, 2, 2.5, 3]);
+    const n = pick([5, 10, 15, 20]);
+    const exp = Math.random() < 0.5;
+    const factor = exp ? Math.exp(r / 100 * n) : Math.pow(1 + r / 100, n);
+    const pn = p0 * factor;
+    return {
+      given: [['모형', exp ? '지수함수 (6강 p11)' : '등비급수 (6강 p9)'], ['기준연도 인구 P₀', `${p0.toLocaleString('ko-KR')} 명`], ['인구 증가율 r', `연 ${r} %`], ['경과연수 n', `${n} 년`]],
+      ask: '목표연도 인구 Pₙ은 몇 명인가?',
+      unit: '명', answer: pn, tol: pn * 0.003,
+      steps: exp ? [
+        `P<sub>n</sub> = P<sub>0</sub> × e<sup>rn</sup>, rn = ${r / 100} × ${n} = ${fmt(r / 100 * n, 3)}`,
+        `e<sup>${fmt(r / 100 * n, 3)}</sup> = ${fmt(factor, 4)}`,
+        `P<sub>n</sub> = ${p0.toLocaleString('ko-KR')} × ${fmt(factor, 4)} ≈ <b>${fmt(pn, 0)}명</b>`,
+      ] : [
+        `P<sub>n</sub> = P<sub>0</sub> × (1 + r)<sup>n</sup> = ${p0.toLocaleString('ko-KR')} × ${fmt(1 + r / 100, 3)}<sup>${n}</sup>`,
+        `${fmt(1 + r / 100, 3)}<sup>${n}</sup> = ${fmt(factor, 4)}`,
+        `P<sub>n</sub> = ${p0.toLocaleString('ko-KR')} × ${fmt(factor, 4)} ≈ <b>${fmt(pn, 0)}명</b>`,
       ],
     };
   }
@@ -593,15 +616,15 @@
       <header class="stack-sm">
         <p class="eyebrow">계산 연습</p>
         <h1 class="page-title">숫자를 바꿔 가며 풀기</h1>
-        <p class="muted">기출에 나온 계산 두 가지예요. '새 문제'를 누를 때마다 숫자가 바뀌어요.</p>
+        <p class="muted">기출에 나온 계산 두 가지와 6강 인구추정이에요. '새 문제'를 누를 때마다 숫자가 바뀌어요.</p>
       </header>
 
       <section class="card">
         <div class="row-between"><h2>도시영향권 경계</h2><span class="years"><span class="tag tag-gichul">2024</span> <span class="tag tag-gichul">2025</span></span></div>
-        <p class="muted small">레일리(Reilly) 소매인력법칙의 분기점 공식 <span class="tag tag-sup">보충</span> 이 내용이 있는 5·6강 자료가 없어 기출 답으로 공식을 확인했어요.</p>
-        <div class="formula">D<sub>A</sub> = D ÷ ( 1 + √(P<sub>B</sub> / P<sub>A</sub>) )</div>
-        <p class="small">D<sub>A</sub>: A시에서 경계까지 거리 · D: 두 도시 간 거리 · P: 인구</p>
-        <p class="small muted">기출 2024: A 100만, B 36만, 20km → 20 ÷ 1.6 = <b>12.5km</b> · 기출 2025: A 100만, B 64만, 36km → 36 ÷ 1.8 = <b>A로부터 20km</b></p>
+        <p class="muted small">레일리 법칙 (6강 <span class="pg">p36~p37</span>): 도시의 흡입력은 인구에 비례하고 거리의 제곱에 반비례해요.</p>
+        <div class="formula">M<sub>ab</sub> = D<sub>ab</sub> ÷ ( 1 + √(P<sub>b</sub> / P<sub>a</sub>) )</div>
+        <p class="small">M<sub>ab</sub>: a에서 경계까지 거리 · D<sub>ab</sub>: 두 도시 간 거리 · P: 인구</p>
+        <p class="small muted">슬라이드 예제: a 25만, b 10만, 75km → <b>a로부터 45.9km</b> · 기출 2024: A 100만, B 36만, 20km → 20 ÷ 1.6 = <b>12.5km</b> · 기출 2025: A 100만, B 64만, 36km → 36 ÷ 1.8 = <b>A로부터 20km</b></p>
         ${problemShell('p-reilly')}
       </section>
 
@@ -613,20 +636,26 @@
       </section>
 
       <section class="card">
-        <div class="row-between"><h2>인구추정모형</h2><span class="years"><span class="tag tag-gichul">2024</span> <span class="tag tag-gichul">2025</span></span></div>
-        <p class="muted small">같은 빈칸 문제가 2년 연속 나왔어요. 5·6강 자료가 없어 기출 모범답안만 정리했어요.</p>
+        <div class="row-between"><h2>인구추정</h2><span class="years"><span class="tag tag-gichul">2024</span> <span class="tag tag-gichul">2025</span></span></div>
+        <p class="muted small">6강 과거추세연장법과 조성법이에요. 기출에는 모형 이름 빈칸이 2년 연속 나왔어요.</p>
         <div class="tbl-wrap"><table class="plain">
-          <thead><tr><th>모형</th><th>언제 쓰나</th></tr></thead>
+          <thead><tr><th>모형</th><th>원문 식</th><th>특징</th></tr></thead>
           <tbody>
-            <tr><td><b>로지스틱 모형</b></td><td>가장 장기적인 추세를 추정할 때</td></tr>
-            <tr><td><b>지수 모형</b></td><td>도시성장 초기에 급격히 증가하는 도시</td></tr>
-            <tr><td><b>조성법 (생잔법)</b></td><td>출생률, 사망률 등을 이용하는 추정법</td></tr>
+            <tr><td><b>등차급수</b> <span class="pg">p8</span></td><td class="nowrap">P<sub>n</sub> = P<sub>0</sub>(1 + rn)</td><td>안정된 인구증가율, 수도권 인근 중소도시</td></tr>
+            <tr><td><b>등비급수</b> <span class="pg">p9</span></td><td class="nowrap">P<sub>n</sub> = P<sub>0</sub>(1 + r)<sup>n</sup></td><td>증가 비율이 일정, 신흥공업도시 같은 급성장도시</td></tr>
+            <tr><td><b>최소제곱법</b> <span class="pg">p10</span></td><td class="nowrap">y = a + bx</td><td>대부분의 도시, 인구증감이 교차해도 적용 가능</td></tr>
+            <tr><td><b>지수함수</b> <span class="pg">p11</span></td><td class="nowrap">P<sub>n</sub> = P<sub>0</sub>e<sup>rn</sup></td><td>인구가 연속적으로 변한다고 가정. <span class="tag tag-gichul">★ 기출</span> 성장 초기 급증 도시</td></tr>
+            <tr><td><b>로지스틱</b> <span class="pg">p13</span></td><td class="nowrap">P<sub>n</sub> = K / (1 + e<sup>a+bn</sup>)</td><td>상한 K까지 인구 통제, 목표와 성장속도 분석. <span class="tag tag-gichul">★ 기출</span> 가장 장기적인 추세</td></tr>
+            <tr><td><b>조성법 (생잔법)</b> <span class="pg">p19</span></td><td>연령별 인구 × 생존율, 출산율</td><td><span class="tag tag-gichul">★ 기출</span> 출생률·사망률 이용, 연령별 인구 예측</td></tr>
           </tbody>
         </table></div>
-        <button class="btn" data-quiz-lec="x">이 내용 퀴즈로 풀기</button>
+        <p class="small muted">p8 등차급수는 r을 '증가량'이라고 적어 놨는데, 증가량이면 식은 P<sub>n</sub> = P<sub>0</sub> + rn이 맞아요. 슬라이드 식과 설명이 서로 안 맞으니 답안에는 r의 뜻을 같이 적어 두세요.</p>
+        ${problemShell('p-pop')}
+        <button class="btn" data-quiz-lec="6">6강 퀴즈 풀기</button>
       </section>`;
     problemCard('p-reilly', genReilly);
     problemCard('p-land', genLand);
+    problemCard('p-pop', genPop);
     bindQuickStarts(app);
   }
 

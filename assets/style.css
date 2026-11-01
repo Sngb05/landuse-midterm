@@ -1,5 +1,5 @@
 /* Layout: single 720px reading column over drawing-paper ground, fixed bottom tab bar (phone first).
-   Lecture colors borrow the Korean zoning-map legend (주거 노랑, 상업 분홍, 공업 보라, 녹지 초록, 하천 파랑). */
+   Lecture colors borrow the Korean zoning-map legend (주거 노랑, 상업 분홍, 공업 보라, 녹지 초록, 관리 주황, 하천 파랑). */
 :root {
   --paper: #F3F4EF;
   --surface: #FFFFFF;
@@ -26,8 +26,8 @@
   --z2: #D6557A;
   --z3: #8966B7;
   --z4: #46975E;
+  --z6: #D9822B;
   --z7: #3A83B6;
-  --zx: #6F7A71;
 
   --font-body: 'IBM Plex Sans KR', 'Apple SD Gothic Neo', 'Malgun Gothic', system-ui, sans-serif;
   --font-display: 'Black Han Sans', 'IBM Plex Sans KR', 'Apple SD Gothic Neo', sans-serif;
@@ -141,6 +141,8 @@ p { margin: 0; }
 table.plain { border-collapse: collapse; width: 100%; font-size: 0.92rem; }
 table.plain th, table.plain td { padding: 9px 12px; text-align: left; border-bottom: 1px solid var(--line); vertical-align: top; }
 table.plain th { background: var(--sunk); }
+table.plain th:first-child, table.plain td:first-child { white-space: nowrap; }
+table.plain td:last-child { min-width: 11em; }
 table.plain tr:last-child td { border-bottom: 0; }
 .eyebrow { font-size: 0.78rem; letter-spacing: 0.06em; color: var(--muted); font-weight: 500; }
 .num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
@@ -324,6 +326,8 @@ table.plain tr:last-child td { border-bottom: 0; }
 }
 .prose h2:first-child { margin-top: 0; }
 .prose h3 { margin-top: 1.6em; scroll-margin-top: 64px; }
+.prose h4 { font-size: 0.98rem; margin: 1.3em 0 0; color: var(--muted); }
+.nowrap { white-space: nowrap; }
 .prose ul, .prose ol { padding-left: 1.25em; margin-bottom: 0; }
 .prose li + li { margin-top: 0.3em; }
 .prose li > ul, .prose li > ol { margin-top: 0.3em; }
