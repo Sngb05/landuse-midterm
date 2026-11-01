@@ -71,25 +71,28 @@
 
   // ---------- router ----------
   let session = null;
+  let penReturnY = null; // scroll position to restore when coming back from a note opened on the 필기 page
 
   function route() {
     const h = decodeURIComponent(location.hash.slice(1)) || 'home';
     let view = 'home', arg = null;
     if (h === 'notes') view = 'notes';
-    else if (/^note[0-9x]$/.test(h)) { view = 'note'; arg = h.slice(4); }
+    else if (/^note[0-9x](@t[0-9x]-\d+)?$/.test(h)) { view = 'note'; arg = h.slice(4); }
+    else if (h === 'pen') view = 'pen';
     else if (h === 'quiz') view = 'quiz';
     else if (h === 'play') view = 'play';
     else if (h === 'calc') view = 'calc';
     else if (/^exams(20\d\d)?$/.test(h)) { view = 'exams'; arg = h.slice(5) || null; }
 
-    const group = { home: 'home', notes: 'notes', note: 'notes', quiz: 'quiz', play: 'quiz', calc: 'calc', exams: 'exams' }[view];
+    const group = { home: 'home', notes: 'notes', note: 'notes', pen: 'pen', quiz: 'quiz', play: 'quiz', calc: 'calc', exams: 'exams' }[view];
     navLinks.forEach(a => {
       if (a.dataset.group === group) a.setAttribute('aria-current', 'page');
       else a.removeAttribute('aria-current');
     });
     document.body.classList.remove('memorize');
     VIEWS[view](arg);
-    window.scrollTo(0, 0);
+    window.scrollTo(0, view === 'pen' && penReturnY != null ? penReturnY : 0);
+    if (view !== 'note') penReturnY = null;
   }
   function go(hash) {
     if (location.hash === '#' + hash) route();
@@ -162,6 +165,12 @@
       </section>
 
       <section class="card">
+        <div class="row-between"><h2>내 필기 모음</h2><span class="tag tag-hand">✍ ${PEN.reduce((n, g) => n + penCount(g), 0)}</span></div>
+        <p class="muted small">아이패드 필기·밑줄·별표만 강의별로 모았어요. 교수님이 짚어 준 부분이라 먼저 보면 좋아요.</p>
+        <a class="btn" href="#pen">필기 모음 보기</a>
+      </section>
+
+      <section class="card">
         <h2>여러 번 나온 문제</h2>
         <ul class="hot">${D.hot.map(h => `<li><a href="${esc(h.href)}"><span>${esc(h.title)}</span><span class="years">${h.years.map(y => `<span class="tag tag-gichul">${esc(String(y))}</span>`).join('')}</span></a></li>`).join('')}</ul>
       </section>
@@ -192,7 +201,8 @@
     return `<p class="legend-line"><span class="tag tag-gichul">★ 기출</span> 시험에 나온 내용 <span class="hand-mark">✍</span> <span class="hand">내 필기</span> <span class="tag tag-sup">보충</span> 슬라이드 밖 설명 <span class="pg">p12</span> PDF 쪽</p>`;
   }
 
-  function viewNote(id) {
+  function viewNote(arg) {
+    const [id, anchor] = String(arg).split('@');
     const L = LEC[id];
     if (!L) { location.replace('#notes'); return; }
     const qn = QUIZ.filter(q => q.lec === id).length;
@@ -233,6 +243,110 @@
       const s = e.target.closest('strong');
       if (s) s.classList.toggle('shown');
     });
+    // Opened from the 필기 page: jump to the slide's heading after route() resets the scroll.
+    if (anchor) requestAnimationFrame(() => {
+      const t = document.getElementById(anchor);
+      if (!t) return;
+      t.scrollIntoView();
+      t.classList.add('flash');
+    });
+  }
+
+  // ---------- handwriting collection ----------
+  const PEN = D.pen;
+  const penCount = g => g.pages.reduce((n, p) => n + p.items.length, 0);
+  const penMarked = it => it.strong || it.hint || it.years.length > 0;
+
+  function penItemHTML(it) {
+    const tags = it.years.map(y => `<span class="tag tag-gichul">★ 기출 ${y}</span>`)
+      .concat(it.hint ? ['<span class="tag tag-strong">시험 힌트</span>'] : it.strong ? ['<span class="tag tag-strong">강조</span>'] : [])
+      .join(' ');
+    return `<li>
+      <p class="pen-memo">${it.memo}${tags ? ` ${tags}` : ''}</p>
+      ${it.note ? `<p class="pen-note">${it.note}</p>` : ''}
+    </li>`;
+  }
+
+  function viewPen() {
+    const s = Object.assign({ lec: 'all', marked: false, hide: false }, store.pen || {});
+    if (s.lec !== 'all' && !PEN.some(g => g.lec === s.lec)) s.lec = 'all';
+    const total = PEN.reduce((n, g) => n + penCount(g), 0);
+    const without = LECS.filter(l => !PEN.some(g => g.lec === l.id)).map(l => l.label).join('·');
+    const chip = (attr, val, label, on) => `<button class="chip" data-${attr}="${val}" aria-pressed="${on}">${label}</button>`;
+
+    app.innerHTML = `
+      <header class="stack-sm">
+        <p class="eyebrow">필기</p>
+        <h1 class="page-title">내 필기 모음</h1>
+        <p class="muted">아이패드로 쓴 메모와 밑줄·별표만 강의별로 모았어요. 수업에서 교수님이 짚어 준 부분이라 출제 가능성이 높아요.</p>
+        <p class="small muted">${total}개${without ? ` · ${esc(without)}은 필기가 없어요` : ''} · <span class="pg">p10</span>은 PDF 쪽, '슬라이드'는 슬라이드 아래 번호예요. 제목을 누르면 노트의 그 부분으로 가요.</p>
+      </header>
+      <section class="card" id="pen-ctrl">
+        <div class="field"><span>범위</span><div class="chips">
+          ${chip('pen-lec', 'all', '전체', s.lec === 'all')}
+          ${PEN.map(g => chip('pen-lec', g.lec, `<i class="swatch" style="${zc(g.lec)}"></i>${esc(LEC[g.lec].label)} <span class="num">${penCount(g)}</span>`, s.lec === g.lec)).join('')}
+        </div></div>
+        <div class="field"><span>보기</span><div class="chips">
+          ${chip('pen-marked', 1, '강조·기출 표시만', s.marked)}
+          ${chip('pen-hide', 1, '필기 가리기', s.hide)}
+        </div></div>
+        <p class="small muted" id="pen-hidetip">가려진 필기를 누르면 보여요. 아래 설명을 보고 내가 뭐라고 적었는지 먼저 떠올려 보세요.</p>
+        <button class="btn" id="pen-quiz"></button>
+      </section>
+      <div class="stack" id="pen-list"></div>`;
+
+    const list = $('#pen-list');
+    const quizPool = () => QUIZ.filter(q => q.tags.includes('필기') && (s.lec === 'all' || q.lec === s.lec));
+    function draw() {
+      $$('[data-pen-lec]').forEach(b => b.setAttribute('aria-pressed', String(s.lec === b.dataset.penLec)));
+      $('[data-pen-marked]').setAttribute('aria-pressed', String(s.marked));
+      $('[data-pen-hide]').setAttribute('aria-pressed', String(s.hide));
+      $('#pen-hidetip').hidden = !s.hide;
+      const qn = quizPool().length;
+      const qb = $('#pen-quiz');
+      qb.textContent = qn ? `필기 관련 퀴즈 ${qn}문항 풀기` : '이 강의엔 필기 관련 퀴즈가 없어요';
+      qb.disabled = !qn;
+
+      list.classList.toggle('pen-hide', s.hide);
+      list.innerHTML = PEN.filter(g => s.lec === 'all' || g.lec === s.lec).map(g => {
+        const L = LEC[g.lec];
+        const pages = g.pages
+          .map(p => Object.assign({}, p, { items: p.items.filter(it => !s.marked || penMarked(it)) }))
+          .filter(p => p.items.length);
+        if (!pages.length) return '';
+        return `<section class="pen-lec" style="${zc(g.lec)}">
+          <h2><i class="swatch"></i>${esc(L.label)} ${esc(L.title)}</h2>
+          ${g.remarks.map(r => `<p class="small muted">${r}</p>`).join('')}
+          ${pages.map(p => `<article class="card pen-card">
+            <div class="pen-head">
+              <span class="pg">p${p.page}</span><span class="small muted">슬라이드 ${p.slide}</span>
+              <a class="pen-topic" href="#note${g.lec}${p.anchor ? '@' + p.anchor : ''}">${p.topic ? esc(p.topic) : `${esc(L.label)} 노트`}</a>
+            </div>
+            <ul class="pen-items">${p.items.map(penItemHTML).join('')}</ul>
+          </article>`).join('')}
+        </section>`;
+      }).join('') || '<p class="muted">조건에 맞는 필기가 없어요.</p>';
+      store.pen = s;
+      persist();
+    }
+
+    $('#pen-ctrl').addEventListener('click', e => {
+      const b = e.target.closest('button');
+      if (!b) return;
+      if (b.dataset.penLec) s.lec = b.dataset.penLec;
+      else if (b.hasAttribute('data-pen-marked')) s.marked = !s.marked;
+      else if (b.hasAttribute('data-pen-hide')) s.hide = !s.hide;
+      else if (b.id === 'pen-quiz') { startSession(shuffle(quizPool()), '필기 관련 문제'); return; }
+      else return;
+      draw();
+    });
+    list.addEventListener('click', e => {
+      if (e.target.closest('.pen-topic')) { penReturnY = window.scrollY; return; }
+      if (!s.hide) return;
+      const li = e.target.closest('.pen-items li');
+      if (li) li.classList.toggle('shown');
+    });
+    draw();
   }
 
   // ---------- quiz setup ----------
@@ -693,7 +807,7 @@
     });
   }
 
-  const VIEWS = { home: viewHome, notes: viewNotes, note: viewNote, quiz: viewQuiz, play: viewPlay, calc: viewCalc, exams: viewExams };
+  const VIEWS = { home: viewHome, notes: viewNotes, note: viewNote, pen: viewPen, quiz: viewQuiz, play: viewPlay, calc: viewCalc, exams: viewExams };
   window.addEventListener('hashchange', route);
   route();
 })();

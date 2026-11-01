@@ -163,7 +163,7 @@ table.plain tr:last-child td { border-bottom: 0; }
 .nav ul {
   list-style: none; margin: 0 auto; padding: 0;
   max-width: 720px;
-  display: grid; grid-template-columns: repeat(5, 1fr);
+  display: grid; grid-template-columns: repeat(6, 1fr);
   height: var(--nav-h);
 }
 .nav a {
@@ -225,6 +225,7 @@ table.plain tr:last-child td { border-bottom: 0; }
 .tag-hand { background: var(--pen-soft); color: var(--pen); }
 .tag-expect { background: var(--accent-soft); color: var(--accent); }
 .tag-sup { background: var(--sunk); color: var(--muted); font-weight: 600; }
+.tag-strong { background: var(--mid-soft); color: var(--mid); }
 .pg {
   font-family: var(--font-mono); font-size: 0.74rem; font-weight: 500;
   color: var(--muted);
@@ -326,7 +327,9 @@ table.plain tr:last-child td { border-bottom: 0; }
 }
 .prose h2:first-child { margin-top: 0; }
 .prose h3 { margin-top: 1.6em; scroll-margin-top: 64px; }
-.prose h4 { font-size: 0.98rem; margin: 1.3em 0 0; color: var(--muted); }
+.prose h4 { font-size: 0.98rem; margin: 1.3em 0 0; color: var(--muted); scroll-margin-top: 64px; }
+.flash { animation: flash 1.8s ease-out; border-radius: 6px; }
+@keyframes flash { from { background: var(--pen-soft); } to { background: transparent; } }
 .nowrap { white-space: nowrap; }
 .prose ul, .prose ol { padding-left: 1.25em; margin-bottom: 0; }
 .prose li + li { margin-top: 0.3em; }
@@ -356,6 +359,24 @@ table.plain tr:last-child td { border-bottom: 0; }
 
 .note-foot { display: flex; flex-wrap: wrap; gap: 8px; }
 .note-foot .btn { flex: 1 1 200px; }
+
+/* ---------- 필기 모음: one card per slide page, tap-to-reveal when hidden ---------- */
+.pen-lec { display: flex; flex-direction: column; gap: 10px; }
+.pen-lec > h2 { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+.pen-card { gap: 10px; border-left: 4px solid var(--zc); }
+.pen-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; }
+.pen-topic { flex-basis: 100%; font-weight: 700; color: var(--ink); text-decoration: none; line-height: 1.4; }
+.pen-topic::after { content: " →"; color: var(--accent); }
+.pen-items { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.pen-items li { display: flex; flex-direction: column; gap: 2px; padding: 10px 0; border-top: 1px dashed var(--line); }
+.pen-items li:first-child { border-top: 0; padding-top: 0; }
+.pen-items li:last-child { padding-bottom: 0; }
+.pen-memo { line-height: 1.55; }
+.pen-memo .hand { font-size: 1.42em; }
+.pen-note { font-size: 0.88rem; color: var(--muted); }
+.pen-note::before { content: "→ "; }
+.pen-hide .pen-items li { cursor: pointer; }
+.pen-hide .pen-items li:not(.shown) .hand { color: transparent; background: var(--pen-soft); border-radius: 4px; }
 
 /* ---------- quiz ---------- */
 .field { display: flex; flex-direction: column; gap: 8px; }
@@ -460,4 +481,5 @@ textarea {
 }
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; scroll-behavior: auto !important; }
+  .flash { animation: none; }
 }

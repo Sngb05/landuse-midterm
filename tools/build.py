@@ -176,7 +176,84 @@ def render_note(lec_id, text):
             gichul_count = len([l for l in rest.splitlines() if l.startswith("- ") and "보너스" not in l])
         cls = ' class="hand-sec"' if is_hand else ""
         html_parts.append(f'<section{cls}><h2 id="{sid}">{decorate(md.render(heading).strip()[3:-4], False)}</h2>{inner}</section>')
-    return summary, "".join(html_parts), sections, hand_count, gichul_count
+    # ### / #### headings get ids in document order so the 필기 모음 page can link into the note (see page_topics).
+    counter = iter(range(1, 10**6))
+    html = re.sub(r"<h([34])>", lambda m: f'<h{m.group(1)} id="t{lec_id}-{next(counter)}">', "".join(html_parts))
+    return summary, html, sections, hand_count, gichul_count
+
+
+EMPHASIS = re.compile(r"별표|☆|밑줄|동그라미|박스|매우\s*중요|여기부터|스펠링")
+HINT = re.compile(r"시험\s*힌트")
+GICHUL_RUN = r"★\s*기출\s*[\d·,\s]*\d"
+
+
+def clean_heading(h):
+    h = re.sub(GICHUL_RUN, "", h)
+    h = re.sub(r"\s*\((?:" + PAGE_RUN + r")\)", "", h)
+    return h.replace("✍️", "").replace("✍", "").strip()
+
+
+def page_topics(lec_id, text):
+    """Map each PDF page to a ###/#### heading. Ids match render_note.
+
+    A page range in the heading itself wins; otherwise the first heading whose lines mention the page.
+    """
+    def pages_in(s):
+        for a, b in re.findall(r"(?<![A-Za-z])p0?(\d+)(?:\s*[~–]\s*p?0?(\d+))?", s):
+            yield from range(int(a), int(b or a) + 1)
+
+    by_heading, by_body, k, cur = {}, {}, 0, None
+    for line in text.splitlines():
+        if line.startswith("## "):
+            cur = None
+            continue
+        m = re.match(r"#{3,4} (.+)", line)
+        if m:
+            k += 1
+            cur = {"anchor": f"t{lec_id}-{k}", "topic": clean_heading(m.group(1))}
+            for p in pages_in(m.group(1)):
+                by_heading.setdefault(p, cur)
+            continue
+        if cur is not None:
+            for p in pages_in(line):
+                by_body.setdefault(p, cur)
+    return {**by_body, **by_heading}
+
+
+def pen_groups(lec_id, text):
+    """The note's '## 손필기 모음' list, grouped by PDF page, for the 필기 모음 page."""
+    parts = re.split(r"(?m)^## 손필기 모음[^\n]*\n", text, maxsplit=1)
+    if len(parts) < 2:
+        return [], []
+    body = re.split(r"(?m)^## ", parts[1], maxsplit=1)[0]
+    topics = page_topics(lec_id, text)
+    pages, remarks = {}, []
+    for line in body.splitlines():
+        m = re.match(r"- \(p0?(\d+)\)\s*(.+)", line)
+        if not m:
+            s = line.strip().lstrip("-※ ").strip()
+            if s:
+                remarks.append(decorate(md.renderInline(s), False))
+            continue
+        page, rest = int(m.group(1)), m.group(2)
+        years = set(re.findall(r"(20\d\d)\s*기출", rest))
+        for run in re.findall(GICHUL_RUN, rest):
+            years |= set(re.findall(r"20\d\d", run))
+        hint = bool(HINT.search(rest))
+        strong = bool(EMPHASIS.search(rest))
+        rest = re.sub(r"\s*" + GICHUL_RUN, "", rest)
+        rest = re.sub(r"\s*\*\*\[(?:강조|시험 힌트)\]\*\*|\s*\(시험 힌트\)", "", rest)
+        # Split at the first arrow outside quotes; memos themselves often contain "→".
+        cut = next((m.start() for m in re.finditer(" → ", rest) if rest[:m.start()].count('"') % 2 == 0), len(rest))
+        memo, note = rest[:cut], rest[cut + 3:]
+        t = topics.get(page, {})
+        # 0~4강·7강 PDFs number pages one above the slide footer (see NOTICE).
+        g = pages.setdefault(page, {"page": page, "slide": page - 1, "topic": t.get("topic", ""),
+                                    "anchor": t.get("anchor", ""), "items": []})
+        g["items"].append({"memo": decorate(md.renderInline(memo.strip()), True),
+                           "note": decorate(md.renderInline(note.strip()), False),
+                           "years": sorted(years), "strong": strong, "hint": hint})
+    return [pages[p] for p in sorted(pages)], remarks
 
 
 def check_quiz(items):
@@ -201,12 +278,15 @@ def check_quiz(items):
     return problems
 
 
-lectures, quiz = [], []
+lectures, quiz, pen = [], [], []
 for lec_id, label, title, short in LECTURES:
     text = (NOTES / f"{lec_id}강.md").read_text(encoding="utf-8")
     summary, html, sections, hand, gichul = render_note(lec_id, text)
     lectures.append({"id": lec_id, "label": label, "title": title, "short": short, "summary": summary,
                      "html": html, "sections": sections, "counts": {"hand": hand, "gichul": gichul}})
+    pen_pages, remarks = pen_groups(lec_id, text)
+    if pen_pages:
+        pen.append({"lec": lec_id, "pages": pen_pages, "remarks": remarks})
     qf = QUIZ / f"{lec_id}강.json"
     items = json.loads(qf.read_text(encoding="utf-8"))["items"] if qf.exists() else []
     for q in items:
@@ -219,7 +299,7 @@ dupes = {i for i in ids if ids.count(i) > 1}
 if dupes:
     problems.append(f"duplicate ids: {sorted(dupes)}")
 
-data = {"meta": {"notice": NOTICE}, "lectures": lectures, "quiz": quiz, "exams": EXAMS, "hot": HOT}
+data = {"meta": {"notice": NOTICE}, "lectures": lectures, "quiz": quiz, "exams": EXAMS, "hot": HOT, "pen": pen}
 out = SITE / "data" / "content.js"
 out.write_text("window.DATA = " + json.dumps(data, ensure_ascii=False) + ";\n", encoding="utf-8")
 
@@ -231,4 +311,9 @@ by_type = {}
 for q in quiz:
     by_type[q["type"]] = by_type.get(q["type"], 0) + 1
 print("  quiz total", len(quiz), by_type)
+for g in pen:
+    items = [it for p in g["pages"] for it in p["items"]]
+    untopiced = [p["page"] for p in g["pages"] if not p["anchor"]]
+    print(f"  pen {g['lec']}강 pages={len(g['pages'])} items={len(items)} "
+          f"strong={sum(1 for it in items if it['strong'] or it['hint'] or it['years'])} no_topic={untopiced}")
 print("problems:", problems or "none")
